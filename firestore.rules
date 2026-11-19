@@ -1,0 +1,180 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSystemOwner() {
+      return isSignedIn() && (
+        ('role' in request.auth.token && (request.auth.token.role == 'owner' || request.auth.token.role == 'admin')) ||
+        ('owner' in request.auth.token && request.auth.token.owner == true) ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['owner', 'admin'] &&
+         (!('active' in get(/databases/$(database)/documents/admins/$(request.auth.uid)).data) ||
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true))
+      );
+    }
+
+    function isAccountOwner(accountId) {
+      return isSignedIn() && request.auth.uid == accountId;
+    }
+
+    function isValidAccount(data, accountId) {
+      return data.keys().hasAll(['id', 'uid', 'email', 'displayName', 'provider', 'role', 'plan', 'createdAt', 'lastLoginAt']) &&
+             data.keys().hasOnly([
+               'id',
+               'uid',
+               'providerId',
+               'email',
+               'displayName',
+               'photoURL',
+               'provider',
+               'linkedProviders',
+               'role',
+               'plan',
+               'isVerified',
+               'associatedDeviceIds',
+               'subscription',
+               'createdAt',
+               'lastLoginAt'
+             ]) &&
+             data.id is string && data.id == accountId && data.id.size() >= 1 && data.id.size() <= 128 &&
+             data.uid is string && data.uid == request.auth.uid && data.uid.size() <= 128 &&
+             (!('providerId' in data) || (data.providerId is string && data.providerId.size() <= 128)) &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 256 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 128 &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1024)) &&
+             data.provider in ['google', 'microsoft', 'local'] &&
+             (!('linkedProviders' in data) || (data.linkedProviders is string && data.linkedProviders.size() <= 256)) &&
+             data.role in ['user', 'admin', 'owner'] &&
+             data.plan in ['free', 'pro', 'creator', 'max', 'custom_annual'] &&
+             (!('isVerified' in data) || data.isVerified is bool) &&
+             (!('associatedDeviceIds' in data) || (data.associatedDeviceIds is list && data.associatedDeviceIds.size() <= 50 && (data.associatedDeviceIds.size() == 0 || data.associatedDeviceIds[0] is string))) &&
+             (!('subscription' in data) || data.subscription is map) &&
+             data.createdAt is string && data.createdAt.size() >= 1 && data.createdAt.size() <= 64 &&
+             data.lastLoginAt is string && data.lastLoginAt.size() >= 1 && data.lastLoginAt.size() <= 64;
+    }
+
+    function isValidWorkspaceResource(data, accountId) {
+      return data.keys().hasAll(['accountId', 'resource', 'payloadJson', 'updatedAt']) &&
+             data.keys().hasOnly(['accountId', 'resource', 'payloadJson', 'updatedAt']) &&
+             data.accountId is string && data.accountId == accountId && data.accountId == request.auth.uid && data.accountId.size() <= 128 &&
+             data.resource is string && data.resource.size() >= 1 && data.resource.size() <= 64 &&
+             data.payloadJson is string && data.payloadJson.size() <= 500000 &&
+             data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidTelemetryEvent(data) {
+      return data.keys().hasAll(['id', 'accountId', 'eventName', 'plan', 'timestamp']) &&
+             data.keys().hasOnly(['id', 'accountId', 'eventName', 'plan', 'feature', 'timestamp']) &&
+             data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+             data.accountId is string && data.accountId == request.auth.uid && data.accountId.size() <= 128 &&
+             data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 64 &&
+             data.plan is string && data.plan.size() >= 1 && data.plan.size() <= 32 &&
+             (!('feature' in data) || (data.feature is string && data.feature.size() <= 64)) &&
+             data.timestamp is string && data.timestamp.size() <= 64;
+    }
+
+    match /test/{docId} {
+      allow get: if isSignedIn() && docId == 'connection';
+      allow list, create, update, delete: if false;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isSystemOwner());
+      allow list: if isSystemOwner();
+      allow create, update, delete: if false;
+    }
+
+    match /accounts/{accountId} {
+      allow get: if isSignedIn() && isValidId(accountId) && (isAccountOwner(accountId) || isSystemOwner());
+      allow list: if isSystemOwner();
+      allow create: if isSignedIn() && isValidId(accountId) && isAccountOwner(accountId) && isValidAccount(incoming(), accountId) && (
+        (incoming().role == 'user' && incoming().plan == 'free') || isSystemOwner()
+      );
+      allow update: if isSignedIn() && isValidId(accountId) && isValidAccount(incoming(), accountId) && (
+        (
+          isAccountOwner(accountId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().email == existing().email &&
+          incoming().role == existing().role &&
+          incoming().plan == existing().plan &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLoginAt', 'linkedProviders', 'provider', 'providerId', 'associatedDeviceIds', 'isVerified'])
+        ) ||
+        isSystemOwner()
+      );
+      allow delete: if isSignedIn() && isValidId(accountId) && (isAccountOwner(accountId) || isSystemOwner());
+    }
+
+    match /workspaces/{accountId}/resources/{resourceId} {
+      allow get: if isSignedIn() && isValidId(accountId) && isValidId(resourceId) && isAccountOwner(accountId);
+      allow list: if isSignedIn() && resource.data.accountId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(accountId) && isValidId(resourceId) && isAccountOwner(accountId) && isValidWorkspaceResource(incoming(), accountId);
+      allow update: if isSignedIn() && isValidId(accountId) && isValidId(resourceId) && isAccountOwner(accountId) && isValidWorkspaceResource(incoming(), accountId) &&
+        (!('accountId' in existing()) || incoming().accountId == existing().accountId) &&
+        (!('resource' in existing()) || incoming().resource == existing().resource) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['accountId', 'resource', 'payloadJson', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(accountId) && isValidId(resourceId) && isAccountOwner(accountId);
+    }
+
+    match /telemetry/{eventId} {
+      allow get: if isSignedIn() && isValidId(eventId) && (resource.data.accountId == request.auth.uid || isSystemOwner());
+      allow list: if isSystemOwner();
+      allow create: if isSignedIn() && isValidId(eventId) && isValidTelemetryEvent(incoming());
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(eventId) && (resource.data.accountId == request.auth.uid || isSystemOwner());
+    }
+
+    // Server-managed operational collections (Admin SDK only)
+    match /server_usage/{usageId} {
+      allow read, write: if false;
+    }
+    match /server_video_quotas/{accountId} {
+      allow read, write: if false;
+    }
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if false;
+    }
+    match /payment_events/{eventId} {
+      allow read, write: if false;
+    }
+    match /server_devices/{deviceId} {
+      allow read, write: if false;
+    }
+    match /server_upgrade_requests/{requestId} {
+      allow read, write: if false;
+    }
+    match /plan_demand_stats/{docId} {
+      allow read, write: if false;
+    }
+    match /server_usage_records/{recordId} {
+      allow read, write: if false;
+    }
+    match /user_ai_credentials/{uid} {
+      allow read, write: if false;
+    }
+    match /ai_usage_metrics/{uid} {
+      allow read, write: if false;
+    }
+  }
+}

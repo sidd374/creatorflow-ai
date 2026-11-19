@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "Account": {
+      "title": "CreatorFlow Account",
+      "description": "Authenticated CreatorFlow user account identity and entitlement profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uid": { "type": "string", "maxLength": 128 },
+        "providerId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256, "format": "email" },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "provider": { "type": "string", "enum": ["google", "microsoft", "local"] },
+        "linkedProviders": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["user", "admin", "owner"] },
+        "plan": { "type": "string", "enum": ["free", "pro", "creator", "max", "custom_annual"] },
+        "isVerified": { "type": "boolean" },
+        "associatedDeviceIds": { "type": "array", "description": "Bounded device identifiers linked to this account (max 50)" },
+        "subscription": { "type": "object", "description": "Authoritative subscription status metadata" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "lastLoginAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "uid", "email", "displayName", "provider", "role", "plan", "createdAt", "lastLoginAt"]
+    },
+    "UserWorkspace": {
+      "title": "CreatorFlow User Workspace",
+      "description": "Account-isolated workspace storage for a CreatorFlow user",
+      "type": "object",
+      "properties": {
+        "accountId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "resource": { "type": "string", "maxLength": 64 },
+        "payloadJson": { "type": "string", "maxLength": 500000 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["accountId", "resource", "payloadJson", "updatedAt"]
+    },
+    "TelemetryEvent": {
+      "title": "CreatorFlow Telemetry Event",
+      "description": "Account-attributed product usage event for Owner Analytics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accountId": { "type": "string", "maxLength": 128 },
+        "eventName": { "type": "string", "maxLength": 64 },
+        "plan": { "type": "string", "maxLength": 32 },
+        "feature": { "type": "string", "maxLength": 64 },
+        "timestamp": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "accountId", "eventName", "plan", "timestamp"]
+    },
+    "AdminRecord": {
+      "title": "CreatorFlow Admin Authorization Record",
+      "description": "Server-managed system owner or administrator role grant mapped to Firebase UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["owner", "admin"] },
+        "active": { "type": "boolean" },
+        "grantedAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "role", "grantedAt"]
+    },
+    "ServerOnlyRecord": {
+      "title": "Server-Managed Operational Record",
+      "description": "Authoritative server-side quota, billing, device, or demand record managed exclusively by Admin SDK",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 }
+      }
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Server-managed active owner/admin authorization records readable only by the matching user or system owner"
+    },
+    "/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "Private user account records strictly isolated to owner or system owner"
+    },
+    "/workspaces/{accountId}/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Account-isolated creator profile, projects, ideas, analytics, and radar opportunities"
+    },
+    "/telemetry/{eventId}": {
+      "schema": { "$ref": "#/entities/TelemetryEvent" },
+      "description": "Product telemetry events writable by authenticated users and readable only by owner"
+    },
+    "/server_usage/{usageId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only monthly and lifetime usage counters (Admin SDK only)"
+    },
+    "/server_video_quotas/{accountId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only rolling 7-day video quota reservations (Admin SDK only)"
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only Cashfree recurring subscription records (Admin SDK only)"
+    },
+    "/payment_events/{eventId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only webhook idempotency and payment audit log (Admin SDK only)"
+    },
+    "/server_devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only device abuse and risk scoring records (Admin SDK only)"
+    },
+    "/server_upgrade_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only upgrade request audit records (Admin SDK only)"
+    },
+    "/plan_demand_stats/{docId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only pre-launch plan demand aggregation (Admin SDK only)"
+    },
+    "/server_usage_records/{recordId}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only usage audit records (Admin SDK only)"
+    },
+    "/user_ai_credentials/{uid}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only encrypted BYOK Gemini API keys isolated per user UID (Admin SDK only)"
+    },
+    "/ai_usage_metrics/{uid}": {
+      "schema": { "$ref": "#/entities/ServerOnlyRecord" },
+      "description": "Server-only per-user BYOK AI usage metrics and telemetry (Admin SDK only)"
+    }
+  }
+}

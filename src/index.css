@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f8f7f4;
+  --ink: #1a1a1a;
+  --accent: #d4a017;
+  --ink-faint: rgba(0, 0, 0, 0.06);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  h1, h2, h3, .font-serif {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom scrollbars for clean editorial UI with gold accent */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(212, 160, 23, 0.06);
+}
+::-webkit-scrollbar-thumb {
+  background: #d4a017;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8890f;
+}
+
+/* Dedicated visible SaaS scrollbar for sidebar with premium gold finish */
+.sidebar-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #d4a017 rgba(212, 160, 23, 0.08);
+  scrollbar-gutter: stable;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-track {
+  background: rgba(212, 160, 23, 0.08);
+  border-radius: 9999px;
+  margin: 4px 0;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb {
+  background: #d4a017;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 2px rgba(212, 160, 23, 0.3);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #b8890f;
+  box-shadow: 0 1px 4px rgba(184, 137, 15, 0.5);
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb:active {
+  background: #966f08;
+}
+
+/* Early Beta horizontal strip animation (accessible + prefers-reduced-motion safe) */
+@keyframes cf-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.cf-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: cf-marquee-scroll 42s linear infinite;
+  will-change: transform;
+}
+
+.cf-marquee-track:hover,
+.cf-marquee-track:focus-within,
+.cf-marquee-paused {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-marquee-track {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* Studio Layout Density toggle support */
+html.cf-density-compact main .space-y-10 {
+  row-gap: 1.5rem;
+}
+
+html.cf-density-compact main .p-6.sm\:p-8 {
+  padding: 1.25rem;
+}
+

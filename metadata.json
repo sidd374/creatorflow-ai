@@ -1,0 +1,8 @@
+{
+  "name": "CreatorFlow AI",
+  "description": "Premium AI toolkit for YouTube creators. Turn one video idea into a complete YouTube content package with titles, hooks, descriptions, Shorts scripts, and keywords.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
